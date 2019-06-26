@@ -2,7 +2,7 @@
 #include <initializer_list>
 #include <algorithm>
 
-template<class ValueType> 
+template<class ValueType>
 class Set {
 private:
     class Node {
@@ -17,131 +17,137 @@ private:
             return *a < *b;
         }
 
-        static int _get_h(const Node* v) {
-            return v == nullptr ? 0 : static_cast<int>(v->h);
-        }   
+        static int _get_height(const Node* v) {
+            return v == nullptr ? 0 : static_cast<int>(v->height);
+        }
 
-        Node *l, *r, *p;
-        size_t h;
+        Node *left;
+        Node *right;
+        Node *parent;
+        size_t height;
 
-        void upd() {
-            h = std::max(_get_h(l), _get_h(r)) + 1;
+        void update_height() {
+            height = std::max(_get_height(left), _get_height(right)) + 1;
         }
 
         void clear() {
-            l = r = p = nullptr;
+            left = right = parent = nullptr;
         }
 
         Node* rotate_right() {
-            Node* q = l;
-            l = q->r;
-            if (l != nullptr) {
-                l->p = this;
+            Node* q = left;
+            left = q->right;
+            if (left != nullptr) {
+                left->parent = this;
             }
-            q->r = this;
-            q->p = p;
-            p = q;
-            this->upd();
-            q->upd();
+            q->right = this;
+            q->parent = parent;
+            parent = q;
+            this->update_height();
+            q->update_height();
             return q;
         }
 
         Node* rotate_left() {
-            Node* q = r;
-            r = q->l;
-            if (r != nullptr) {
-                r->p = this;
+            Node* q = right;
+            right = q->left;
+            if (right != nullptr) {
+                right->parent = this;
             }
-            q->l = this;
-            q->p = p;
-            p = q;
-            this->upd();
-            q->upd();
+            q->left = this;
+            q->parent = parent;
+            parent = q;
+            this->update_height();
+            q->update_height();
             return q;
         }
 
         Node* _fix_node() {
-            upd();
-            int dh = _get_h(l) - _get_h(r);
-            if (std::abs(dh) <= 1) {
+            update_height();
+            int delta_height = _get_height(left) - _get_height(right);
+            if (std::abs(delta_height) <= 1) {
                 return this;
             }
-            if (dh == 2) {
-                if (_get_h(l->l) >= _get_h(l->r)) {
+            if (delta_height == 2) {
+                if (_get_height(left->left) >= _get_height(left->right)) {
                     return rotate_right();
                 } else {
-                    l = l->rotate_left();
+                    left = left->rotate_left();
                     return rotate_right();
                 }
             } else {
-                if (_get_h(r->r) >= _get_h(r->l)) {
+                if (_get_height(right->right) >= _get_height(right->left)) {
                     return rotate_left();
                 } else {
-                    r = r->rotate_right();
+                    right = right->rotate_right();
                     return rotate_left();
                 }
             }
         }
 
-        static void _set_child(Node* par, Node* old_child, Node* new_child) {
+        static void _set_child(Node* new_parent, Node* old_child, Node* new_child) {
             if (new_child != nullptr) {
-                new_child->p = par;
+                new_child->parent = new_parent;
             }
-            if (par == nullptr) {
+            if (new_parent == nullptr) {
                 return;
             }
-            if (par->l == old_child) {
-                par->l = new_child;
+            if (new_parent->left == old_child) {
+                new_parent->left = new_child;
             } else {
-                par->r = new_child;
+                new_parent->right = new_child;
             }
         }
 
     public:
         ValueType* value;
 
-        Node() : l(nullptr), r(nullptr), p(nullptr), h(0), value(nullptr) {}
+        Node() : left(nullptr), right(nullptr), parent(nullptr), height(0), value(nullptr) {}
 
-        Node(const ValueType& val, Node* _p) : l(nullptr), r(nullptr), p(_p), h(1), value(new ValueType(val)) {}
+        Node(const ValueType& val, Node* _parent) : Node() {
+            parent = _parent;
+            height = 1;
+            value = new ValueType(val);
+        }
 
         ~Node() {
             delete value;
-            delete l;
-            delete r;
+            delete left;
+            delete right;
         }
 
         const Node* get_min() const {
             const Node* v = this;
-            while (v->l != nullptr) {
-                v = v->l;
+            while (v->left != nullptr) {
+                v = v->left;
             }
             return v;
         }
 
         const Node* get_max() const {
             const Node* v = this;
-            while (v->r != nullptr) {
-                v = v->r;
+            while (v->right != nullptr) {
+                v = v->right;
             }
             return v;
         }
 
-        Node* insert(const ValueType& val, bool& flag_added) {
+        Node* insert(const ValueType& val, bool* flag_added) {
             if (_less(&val, value)) {
-                if (l == nullptr) {
-                    l = new Node(val, this);
-                    flag_added = true;
+                if (left == nullptr) {
+                    left = new Node(val, this);
+                    *flag_added = true;
                 } else {
-                    l = l->insert(val, flag_added);
-                    l->p = this;
+                    left = left->insert(val, flag_added);
+                    left->parent = this;
                 }
             } else if (_less(value, &val)) {
-                if (r == nullptr) {
-                    r = new Node(val, this);
-                    flag_added = true;
+                if (right == nullptr) {
+                    right = new Node(val, this);
+                    *flag_added = true;
                 } else {
-                    r = r->insert(val, flag_added);
-                    r->p = this;
+                    right = right->insert(val, flag_added);
+                    right->parent = this;
                 }
             }
             return _fix_node();
@@ -153,23 +159,23 @@ private:
                 new_root = this;
                 return nullptr;
             }
-            if (v->l != nullptr && v->r != nullptr) {
+            if (v->left != nullptr && v->right != nullptr) {
                 Node* nxt = const_cast<Node*>(v->next());
                 std::swap(nxt->value, v->value);
                 v = nxt;
             }
-            Node* q = v->p;
-            if (v->l != nullptr) {
-                _set_child(q, v, v->l);
-                new_root = v->l;
-            } else if (v->r != nullptr) {
-                _set_child(q, v, v->r);
-                new_root = v->r;
+            Node* q = v->parent;
+            if (v->left != nullptr) {
+                _set_child(q, v, v->left);
+                new_root = v->left;
+            } else if (v->right != nullptr) {
+                _set_child(q, v, v->right);
+                new_root = v->right;
             } else {
                 _set_child(q, v, nullptr);
             }
             while (q != nullptr) {
-                Node* nq = q->p;
+                Node* nq = q->parent;
                 new_root = q->_fix_node();
                 _set_child(nq, q, new_root);
                 q = nq;
@@ -178,28 +184,26 @@ private:
             return v;
         }
 
-
-
         const Node* next() const {
-            if (r != nullptr) {
-                return r->get_min();
+            if (right != nullptr) {
+                return right->get_min();
             }
             auto v = this;
-            while (v->p != nullptr && v->p->r == v) {
-                v = v->p;
+            while (v->parent != nullptr && v->parent->right == v) {
+                v = v->parent;
             }
-            return v->p;
+            return v->parent;
         }
 
         const Node* prev() const {
-            if (l != nullptr) {
-                return l->get_max();
+            if (left != nullptr) {
+                return left->get_max();
             }
             auto v = this;
-            while (v->p != nullptr && v->p->l == v) {
-                v = v->p;
+            while (v->parent != nullptr && v->parent->left == v) {
+                v = v->parent;
             }
-            return v->p;
+            return v->parent;
         }
 
         const Node* find(const ValueType& val) const {
@@ -215,9 +219,9 @@ private:
             while (root != nullptr) {
                 if (_less(&val, root->value) || !_less(root->value, &val)) {
                     ans = root;
-                    root = root->l;
+                    root = root->left;
                 } else {
-                    root = root->r;
+                    root = root->right;
                 }
             }
             return ans;
@@ -225,32 +229,32 @@ private:
     };
 
 public:
-    Set() : root(new Node()), _beg(root), _end(root), __size(0) {}
+    Set() : root(new Node()), begin_iterator(root), end_iterator(root), size_value(0) {}
 
     template<class Iter>
-    Set(Iter beg, Iter end) : root(new Node()), _beg(root), _end(root), __size(0) {
-        while (beg != end) {
-            insert(*beg++);
+    Set(Iter begin, Iter end) : Set() {
+        while (begin != end) {
+            insert(*begin++);
         }
     }
 
-    Set(std::initializer_list<ValueType> l) : root(new Node()), _beg(root), _end(root), __size(0) {
-        for (const auto& v : l) {
-            insert(v);
+    Set(std::initializer_list<ValueType> lst) : Set() {
+        for (const auto& elem : lst) {
+            insert(elem);
         }
     }
 
     void swap(Set& other) {
         using std::swap;
         swap(root, other.root);
-        swap(_beg, other._beg);
-        swap(_end, other._end);
-        swap(__size, other.__size);
+        swap(begin_iterator, other.begin_iterator);
+        swap(end_iterator, other.end_iterator);
+        swap(size_value, other.size_value);
     }
 
-    Set(const Set& other) : root(new Node()), _beg(root), _end(root), __size(0) {
-        for (const auto& v : other) {
-            insert(v);
+    Set(const Set& other) : Set() {
+        for (const auto& elem : other) {
+            insert(elem);
         }
     }
 
@@ -268,102 +272,104 @@ public:
     }
 
     size_t size() const {
-        return __size;
+        return size_value;
     }
 
     bool empty() const {
-        return __size == 0;
+        return size_value == 0;
     }
 
     void insert(const ValueType& val) {
         bool flag_added = false;
-        root = root->insert(val, flag_added);
-        if (flag_added) {
-            ++__size;
+        root = root->insert(val, &flag_added);
+        if (!flag_added) {
+            return;
         }
-        _beg = iterator(root->get_min());
+        ++size_value;
+        begin_iterator = iterator(root->get_min());
     }
 
     void erase(const ValueType& val) {
         Node* v = root->erase(val, root);
-        if (v != nullptr) {
-            --__size;
+        if (v == nullptr) {
+            return;
         }
+        --size_value;
         delete v;
-        _beg = iterator(root->get_min());
-        _end = iterator(root->get_max());
+        begin_iterator = iterator(root->get_min());
+        end_iterator = iterator(root->get_max());
     }
 
     class iterator {
     private:
-        const Node* v;
+        const Node* vertex;
 
     public:
-        iterator() : v(nullptr) {}
+        iterator() : vertex(nullptr) {}
 
-        iterator(const Node* p) : v(p) {}
-        
+        iterator(const Node* p) : vertex(p) {}
+
         const ValueType& operator * () const {
-            return *v->value;
+            return *vertex->value;
         }
 
         bool operator == (const iterator& other) const {
-            return v == other.v;
+            return vertex == other.vertex;
         }
 
         bool operator != (const iterator& other) const {
-            return v != other.v;
+            return vertex != other.vertex;
         }
 
         const ValueType* operator -> () const {
-            return v->value;
+            return vertex->value;
         }
 
         iterator& operator ++ () {
-            v = v->next();
+            vertex = vertex->next();
             return *this;
         }
 
         iterator operator ++ (int) {
             auto tmp = *this;
-            ++(*this);
+            ++*this;
             return tmp;
         }
 
         iterator& operator -- () {
-            v = v->prev();
+            vertex = vertex->prev();
             return *this;
         }
 
         iterator operator -- (int) {
             auto tmp = *this;
-            --(*this);
+            --*this;
             return tmp;
         }
     };
-    
+
     iterator begin() const {
-        return _beg;
+        return begin_iterator;
     }
 
     iterator end() const {
-        return _end;
+        return end_iterator;
     }
 
     iterator find(const ValueType& val) const {
         auto v = root->find(val);
         if (v == nullptr) {
-            return _end;
+            return end_iterator;
         }
         return iterator(v);
     }
 
-    iterator lower_bound(const ValueType& val) const {
+    iterator lower_bound(const ValueType& val)  const {
         return iterator(Node::lower_bound(root, val));
     }
 
 private:
-        Node* root;
-        iterator _beg, _end;
-        size_t __size;
+    Node* root;
+    iterator begin_iterator, end_iterator;
+    size_t size_value;
 };
